@@ -120,7 +120,6 @@ int main(int argc, char* argv[])
 
 		// 받은 데이터 출력
 		buf[retval] = '\0';
-		printf("[TCP 클라이언트] %d바이트를 받았습니다.\n", retval);
 		printf("[받은 데이터] %s\n", buf);
 	}
 

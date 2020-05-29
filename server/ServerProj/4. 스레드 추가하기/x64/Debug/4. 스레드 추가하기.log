@@ -1,0 +1,8 @@
+﻿  CSocket.cpp
+  CSocketMgr.cpp
+C:\NabzackoStudy\NabzackoStudy\server\ServerProj\4. 스레드 추가하기\global.h(5,10): warning C4067: 전처리기 지시문 다음에 예기치 않은 토큰이 있습니다. 줄 바꿈 문자가 필요합니다.
+  main.cpp
+C:\NabzackoStudy\NabzackoStudy\server\ServerProj\4. 스레드 추가하기\global.h(5,10): warning C4067: 전처리기 지시문 다음에 예기치 않은 토큰이 있습니다. 줄 바꿈 문자가 필요합니다.
+  코드를 생성하고 있습니다...
+C:\NabzackoStudy\NabzackoStudy\server\ServerProj\4. 스레드 추가하기\global.h(5,10): warning C4067: 전처리기 지시문 다음에 예기치 않은 토큰이 있습니다. 줄 바꿈 문자가 필요합니다.
+  4. 스레드 추가하기.vcxproj -> C:\NabzackoStudy\NabzackoStudy\server\ServerProj\x64\Debug\4. 스레드 추가하기.exe
