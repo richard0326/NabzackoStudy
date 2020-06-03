@@ -1,8 +1,23 @@
 #include "global.h"
-#include "CSocketMgr.h"
 #include "CSocket.h"
+#include "CSocketMgr.h"
 
-DWORD WINAPI ProcessClient(LPVOID arg);
+const char* loginMsg[] = { "아이디가 옳바르지 않습니다. 다시 입력해주세요.", "비밀번호가 틀렸습니다. 다시 입력해주세요.", "로그인 성공!" };
+const char* resultMsg[] = { "아이디 입력 오류", "비밀번호 입력 오류", "로그인 성공" };
+
+int g_Idcount = 3;
+
+struct IdInfo
+{
+	char ID[10];
+	char PW[10];
+};
+
+IdInfo g_IdInfos[] = {
+	{ "kja0204", "1234" },
+	{ "aaaa1234", "1234" },
+	{ "bbbb1234", "1234" }
+};
 
 CSocketMgr::CSocketMgr() 
 	: m_listen_sock(NULL)
@@ -74,62 +89,6 @@ void CSocketMgr::loop()
 	{
 		if (Accept() == false)
 			continue;
-
-		/*
-		// 쓰레드 생성
-		// 클라이언트와 데이터 통신
-		while (true)
-		{
-			
-			// recv()
-			retval = recv(client_sock, buf, sizeof(LoginInfo), 0);		// 클라이언트 소켓으로 부터 데이터를 받는다.
-
-			if (retval == SOCKET_ERROR) {			// 데이터에 문제가 있을시 에러 출력 후 탈출
-				err_display("recv()");
-				break;
-			}
-			else if (retval == 0)					// 데이터가 0일 경우 통신 종료를 의미한다.
-				break;
-
-			// 받은 데이터의 크기 출력
-			LoginInfo login;
-			ZeroMemory(&login, sizeof(LoginInfo));
-			memcpy(login.ID, (void*)buf, sizeof(char) * 20);
-			memcpy(login.PW, (void*)(buf + (sizeof(char) * 20)), sizeof(char) * 20);
-			int len1 = strlen(login.ID);
-			int len2 = strlen(login.PW);
-			login.ID[len1 - 1] = NULL;
-			login.PW[len2 - 1] = NULL;
-
-			printf("아이디 : %s, 비밀번호 : %s\n", login.ID, login.PW);
-
-			bool isSuccess = false;
-			for (int i = 0; i < 3; i++) {
-				if (strcmp(confirmLogin[i].ID, login.ID) == 0 && strcmp(confirmLogin[i].PW, login.PW) == 0) {
-					isSuccess = true;
-					break;
-				}
-			}
-
-			ZeroMemory(buf, sizeof(BUFSIZE) + 1);
-			if (isSuccess == true) {
-				printf("로그인 성공\n");
-				strcpy_s(buf, "로그인 성공");
-			}
-			else {
-				printf("로그인 실패\n");
-				strcpy_s(buf, "로그인 실패");
-			}
-
-			retval = send(client_sock, buf, retval, 0);		// 클라이언트 소켓으로 데이터를 전송
-			if (retval == SOCKET_ERROR) {			// 데이터에 문제가 있을시 에러 출력 후 탈출
-				err_display("send()");
-				break;
-			}
-		}
-		*/
-		cout << "test" << endl;
-		//
 	}
 }
 
@@ -206,7 +165,7 @@ int recvn(SOCKET s, char* buf, int len, int flags)
 
 
 // 클라이언트와 데이터 통신
-DWORD WINAPI ProcessClient(LPVOID arg)
+DWORD WINAPI CSocketMgr::ProcessClient(LPVOID arg)
 {
 	CSocket* sock = (CSocket*)arg;
 	SOCKET client_sock = sock->getSocket();
@@ -274,15 +233,18 @@ DWORD WINAPI ProcessClient(LPVOID arg)
 
 		if (logValue == LOGIN_SUCCESS)
 		{
+			/*
 			strcpy(client_packet->client_IdInfo.ID, checkId.ID);
 			strcpy(client_packet->client_IdInfo.PW, checkId.PW);
 			printf("스레드ID : %d\n아이디, 패스워드 저장완료\n쓰레드를 종료합니다.\n", threadId);
 			client_packet->loginSuccess = true;
 			delete client_packet;
 			client_packet = NULL;
+			*/
+			printf("로그인 성공\n");
 			break;
 		}
+		
 	}
-
 	return 0;
 }

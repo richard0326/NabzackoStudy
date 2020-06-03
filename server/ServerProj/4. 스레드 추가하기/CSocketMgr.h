@@ -18,4 +18,6 @@ private:
 	bool Accept();
 	void err_quit(const char* msg);
 	void err_display(const char* msg);
+
+	static DWORD WINAPI ProcessClient(LPVOID arg);
 };
