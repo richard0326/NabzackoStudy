@@ -1,6 +1,7 @@
 #include "Global.h"
 #include "CSocket.h"
 #include "CSocketMgr.h"
+#include "CUserMgr.h"
 
 const char* loginMsg[] = { "아이디가 옳바르지 않습니다. 다시 입력해주세요.", "비밀번호가 틀렸습니다. 다시 입력해주세요.", "로그인 성공!" };
 const char* resultMsg[] = { "아이디 입력 오류", "비밀번호 입력 오류", "로그인 성공" };
@@ -40,12 +41,14 @@ bool CSocketMgr::Init() {
 		SINGLETON(CLogMgr)->Addlog("WSA 버전 설정 실패");
 		return false;
 	}
+
 	// socket()
 	m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);		// 소켓을 생성하는 함수		
 	if (m_listen_sock == INVALID_SOCKET) {
 		SINGLETON(CLogMgr)->Addlog("Listen 소켓 설정 실패");	// 소켓 생성 실패 시 에러 출력 후 종료
 		return false;
 	}
+
 	// bind()
 	SOCKADDR_IN serveraddr;							// 서버의 주소 정보를 담을 변수
 	ZeroMemory(&serveraddr, sizeof(serveraddr));	// 0으로 모두 초기화
@@ -58,25 +61,19 @@ bool CSocketMgr::Init() {
 		SINGLETON(CLogMgr)->Addlog("Bind 실패");								// 접속 허용 실패시 에러 출력 후 종료 
 		return false;
 	}
+
 	// listen()
 	retval = listen(m_listen_sock, SOMAXCONN);			// 클라이언트를 수용할 수 있는 소켓으로 만들어준다.
 	if (retval == SOCKET_ERROR) {
 		SINGLETON(CLogMgr)->Addlog("Listen 상태 실패");	// 소켓 변환 실패시 에러 출력 후 종료
 		return false;
 	}
+
 	return true;
 }
 
-void CSocketMgr::Release() {
-	list<CSocket*>::iterator iter;
-	for (iter = m_socketList.begin(); iter != m_socketList.end();) {
-		list<CSocket*>::iterator erase = iter;
-		iter++;
-
-		SAFE_DELETE(*erase)
-		m_socketList.erase(erase);
-	}
-
+void CSocketMgr::Release() 
+{
 	// closesocket()
 	closesocket(m_listen_sock);
 
@@ -112,13 +109,13 @@ bool CSocketMgr::Accept()
 	}
 	else { CloseHandle(hThread); }
 
-	m_socketList.push_back(sock);
+	SINGLETON(CUserMgr)->push_back(sock);
 
 	return true;
 }
 
 // 사용자 정의 데이터 수신 함수
-int recvn(SOCKET s, char* buf, int len, int flags)
+int CSocketMgr::recvn(SOCKET s, char* buf, int len, int flags)
 {
 	int received;
 	char* ptr = buf;
@@ -137,6 +134,55 @@ int recvn(SOCKET s, char* buf, int len, int flags)
 	return (len - left);
 }
 
+bool CSocketMgr::recvPacket(int* val1, int* val2, char* ret, SOCKET s, int flags)
+{
+	int total = 0;
+	int retval = recv(s, (char*)&total, sizeof(int), 0);
+	if (retval == SOCKET_ERROR) {
+		SINGLETON(CLogMgr)->Addlog("Recv total Error()\n");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	char buf[BUFSIZE];
+	ZeroMemory(buf, BUFSIZE);
+	retval = recv(s, buf, total - sizeof(int), 0);
+	if (retval == SOCKET_ERROR) {
+		SINGLETON(CLogMgr)->Addlog("Recv Other Error()\n");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	memcpy(val1, buf, sizeof(int));
+	memcpy(val2, buf + sizeof(int), sizeof(int));
+	memcpy(ret, buf + sizeof(int) + sizeof(int), total - sizeof(int) - sizeof(int) - sizeof(int));
+
+	return true;
+}
+
+bool SendPacket(int* val1, int* val2, char* info, SOCKET s, int flags)
+{
+	// 가변길이 패킷
+	int infoSize = strlen((char*)info);
+	int total = sizeof(int) + sizeof(int) + sizeof(int) + infoSize;
+
+	char buf[BUFSIZE];
+	ZeroMemory(buf, BUFSIZE);
+	memcpy(buf, &total, sizeof(int));
+	memcpy(buf + sizeof(int), val1, sizeof(int));
+	memcpy(buf + sizeof(int) + sizeof(int), val2, sizeof(int));
+	memcpy(buf + sizeof(int) + sizeof(int) + sizeof(int), info, infoSize);
+
+	int retval = send(s, buf, total, 0);
+	if (retval == SOCKET_ERROR) {
+		SINGLETON(CLogMgr)->Addlog("Send Error\n");
+		return false;
+	}
+
+	return true;
+}
 
 // 클라이언트와 데이터 통신
 DWORD WINAPI CSocketMgr::ProcessClient(LPVOID arg)
@@ -152,25 +198,14 @@ DWORD WINAPI CSocketMgr::ProcessClient(LPVOID arg)
 	// 전체 반복문
 	while (1)
 	{
-		int total = 0;
+		int val1 = 0;
+		int val2 = 0;
 		IdInfo checkId;
-
+		ZeroMemory(&checkId, sizeof(IdInfo));
 		// 데이터 받기
-		retval = recvn(client_sock, (char*)&total, sizeof(int), 0);
-		if (retval == SOCKET_ERROR) {
-			SINGLETON(CLogMgr)->Addlog("Recv Error()\n");
+		if(recvPacket(&val1, &val2, (char*)&checkId, client_sock, 0) == false) {
 			break;
 		}
-		else if (retval == 0)
-			break;
-
-		retval = recvn(client_sock, (char*)&checkId, total - sizeof(int), 0);
-		if (retval == SOCKET_ERROR) {
-			SINGLETON(CLogMgr)->Addlog("Recv Error()\n");
-			break;
-		}
-		else if (retval == 0)
-			break;
 
 		int logValue = -1;
 		for (int i = 0; i < g_Idcount; i++)
@@ -196,34 +231,14 @@ DWORD WINAPI CSocketMgr::ProcessClient(LPVOID arg)
 		DWORD threadId = GetCurrentThreadId();
 		printf("스레드ID : %d\n결과 : %s\n", threadId, resultMsg[logValue]);
 
-		// 가변길이 패킷
-		total = 0;
-		int msglen = strlen(loginMsg[logValue]);
-		total = sizeof(int) + sizeof(int) + sizeof(int) + msglen;
-		ZeroMemory(buf, sizeof(buf));
-		memcpy(buf, &total, sizeof(int));
-		memcpy(buf + sizeof(int), &logValue, sizeof(int));
-		memcpy(buf + sizeof(int) + sizeof(int), &msglen, sizeof(int));
-		memcpy(buf + sizeof(int) + sizeof(int) + sizeof(int), loginMsg[logValue], msglen);
-
-		// 데이터 보내기
-		retval = send(client_sock, (char*)&buf, total, 0);
-		if (retval == SOCKET_ERROR) {
-			SINGLETON(CLogMgr)->Addlog("Send Error\n");
+		val2 = logValue;
+		if (SendPacket(&val1, &val2, (char*)resultMsg[logValue], client_sock, 0) == false)
+		{
 			break;
 		}
 
-
 		if (logValue == LOGIN_SUCCESS)
 		{
-			/*
-			strcpy(client_packet->client_IdInfo.ID, checkId.ID);
-			strcpy(client_packet->client_IdInfo.PW, checkId.PW);
-			printf("스레드ID : %d\n아이디, 패스워드 저장완료\n쓰레드를 종료합니다.\n", threadId);
-			client_packet->loginSuccess = true;
-			delete client_packet;
-			client_packet = NULL;
-			*/
 			printf("로그인 성공\n");
 			break;
 		}

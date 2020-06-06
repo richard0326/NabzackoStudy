@@ -1,6 +1,7 @@
 #include "Global.h"
 #include "CServerMgr.h"
 #include "CSocketMgr.h"
+#include "CUserMgr.h"
 
 CServerMgr::CServerMgr()
 	:m_hThread(NULL)
@@ -19,6 +20,11 @@ bool CServerMgr::Init()
 	SetConsoleTitleA(SERVER_NAME);
 
 	if (SINGLETON(CLogMgr)->Init(LOG_ALL, NULL) == false) 
+	{
+		return false;
+	}
+
+	if (SINGLETON(CUserMgr)->Init() == false)
 	{
 		return false;
 	}
@@ -53,6 +59,7 @@ void CServerMgr::Release()
 {
 	CloseHandle(m_hThread);
 	
+	DESTROY_SINGLETON(CUserMgr)
 	// Singleton ∞¥√º ªË¡¶
 	DESTROY_SINGLETON(CSocketMgr)
 		

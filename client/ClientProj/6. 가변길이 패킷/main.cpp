@@ -14,7 +14,7 @@
 #define LOGIN_SUCCESS	2
 
 // 고정 길이 데이터 패킷 - 유저 정보 구조체
-struct _UserInfo
+struct IdInfo
 {
 	char ID[10];
 	char PW[10];
@@ -67,6 +67,66 @@ int recvn(SOCKET s, char* buf, int len, int flags)
 	return (len - left);
 }
 
+bool recvPacket(int* val1, int* val2, char* ret, SOCKET s, int flags)
+{
+	int total = 0;
+	int retval = recvn(s, (char*)&total, sizeof(int), 0);
+	if (retval == SOCKET_ERROR) {
+		printf("Recv total Error()\n");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	retval = recvn(s, (char*)val1, sizeof(int), 0);
+	if (retval == SOCKET_ERROR) {
+		printf("Recv val1 Error()\n");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	retval = recvn(s, (char*)val2, sizeof(int), 0);
+	if (retval == SOCKET_ERROR) {
+		printf("Recv val2 Error()\n");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	retval = recvn(s, (char*)ret, total - sizeof(int) * 3, 0);
+	if (retval == SOCKET_ERROR) {
+		printf("Recv info Error()\n");
+		return false;
+	}
+	else if (retval == 0)
+		return false;
+
+	return true;
+}
+
+bool SendPacket(int* val1, int* val2, char* info, SOCKET s, int flags)
+{
+	// 가변길이 패킷
+	int infoSize = sizeof(IdInfo);
+	int total = sizeof(int) + sizeof(int) + sizeof(int) + infoSize;
+
+	char buf[BUFSIZE];
+	ZeroMemory(buf, BUFSIZE);
+	memcpy(buf, &total, sizeof(int));
+	memcpy(buf + sizeof(int), val1, sizeof(int));
+	memcpy(buf + sizeof(int) + sizeof(int), val2, sizeof(int));
+	memcpy(buf + sizeof(int) + sizeof(int) + sizeof(int), info, infoSize);
+
+	int retval = send(s, buf, total, 0);
+	if (retval == SOCKET_ERROR) {
+		printf("Send Error\n");
+		return false;
+	}
+
+	return true;
+}
+
 int main(int argc, char* argv[])
 {
 	int retval;
@@ -95,7 +155,7 @@ int main(int argc, char* argv[])
 	// 서버와 데이터 통신
 	while (1) {
 		// 입력 받을 UserInfo 구조체에 값을 넣어준다.
-		_UserInfo user;
+		IdInfo user;
 		ZeroMemory(&user, sizeof(user));
 		printf("ID:");
 		scanf("%s", user.ID);
@@ -103,53 +163,23 @@ int main(int argc, char* argv[])
 		printf("PW:");
 		scanf("%s", user.PW);
 
-		ZeroMemory(buf, BUFSIZE);
-		int total = sizeof(int) + sizeof(_UserInfo);
-		memcpy(buf, &total, sizeof(int));
-		memcpy(buf + sizeof(int), &user, sizeof(_UserInfo));
 		// 데이터 보내기
-		retval = send(sock, buf, total, 0);
-		if (retval == SOCKET_ERROR) {
-			err_display("send()");
-			break;
-		}
-
-		// 데이터 받기
-		// 전체 크기를 먼저 받는다.
-		total = 0;
-		retval = recvn(sock, (char*)&total, sizeof(int), 0);
-		if (retval == SOCKET_ERROR) {
-			err_display("recv()");
-			break;
-		}
-		else if (retval == 0)
+		int val1 = 1;
+		int val2 = 1;;
+		if (SendPacket(&val1, &val2, (char*)&user, sock, 0) == false)
 			break;
 
-		ZeroMemory(buf, sizeof(buf));
-		// 메세지의 문자열을 받는다.
-		retval = recvn(sock, buf, total - sizeof(int), 0);
-		if (retval == SOCKET_ERROR) {
-			err_display("recv()");
-			break;
-		}
-		else if (retval == 0)
-			break;
-
-		int result = 0;
-		memcpy(&result, buf, sizeof(int));
-		int msglen = 0;
-		memcpy(&msglen, buf + sizeof(int), sizeof(int));
 		char msg[BUFSIZE] = "";
-		memcpy(&msg, buf + sizeof(int) + sizeof(int), msglen);
-
+		if (recvPacket(&val1, &val2, (char*)msg, sock, 0) == false)
+			break;
+				
 		// 문자열을 출력한다.
-		msg[msglen] = '\0';
 		printf("%s\n", msg);
 		puts("");
 
-		// 로그인을 성공할 시
-		if (result == LOGIN_SUCCESS)
+		if (val2 == LOGIN_SUCCESS)
 		{
+			printf("로그인 성공!\n");
 			break;
 		}
 	}
